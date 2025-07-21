@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Header Hunter 2.0 Challenge</title>
+<style>
+  body {
+    background: #121212;
+    color: #eee;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    padding: 2rem;
+    max-width: 500px;
+    margin: auto;
+  }
+
+  h1 {
+    color: #f39c12;
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+
+  form {
+    background: #1f1f1f;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 0 15px #f39c12aa;
+  }
+
+  label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    margin-top: 1rem;
+  }
+
+  input[type="text"] {
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    border-radius: 5px;
+    border: none;
+    background: #2c2c2c;
+    color: #eee;
+    font-size: 1rem;
+    box-sizing: border-box;
+    transition: background-color 0.3s ease;
+  }
+  input[type="text"]:focus {
+    background: #3f3f3f;
+    outline: none;
+  }
+
+  button {
+    margin-top: 1.5rem;
+    background: #f39c12;
+    border: none;
+    padding: 0.8rem 1.2rem;
+    font-weight: 700;
+    font-size: 1rem;
+    border-radius: 5px;
+    cursor: pointer;
+    color: #222;
+    transition: background-color 0.3s ease;
+  }
+  button:hover {
+    background: #e67e22;
+  }
+
+  #generateSigBtn {
+    background: #2980b9;
+    margin-left: 0.5rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #fff;
+  }
+  #generateSigBtn:hover {
+    background: #3498db;
+  }
+
+  #result {
+    margin-top: 1.5rem;
+    background: #292929;
+    padding: 1rem;
+    border-radius: 5px;
+    min-height: 3rem;
+    font-family: monospace;
+    white-space: pre-wrap;
+  }
+
+  @media (max-width: 600px) {
+    body {
+      padding: 1rem;
+    }
+  }
+</style>
+</head>
+<body>
+
+<h1>Header Hunter 2.0</h1>
+<form id="headerForm">
+  <label for="token">X-Auth-Token:</label>
+  <input type="text" id="token" name="token" value="abc12346" required />
+
+  <label for="useragent">User-Agent:</label>
+  <input type="text" id="useragent" name="useragent" value="HeaderHunter/1.0" required />
+
+  <label for="signature">X-Request-Signature:</label>
+  <input type="text" id="signature" name="signature" placeholder="Generate or enter signature" required />
+  <button type="button" id="generateSigBtn">Generate Signature for Today</button>
+
+  <button type="submit">Submit Request</button>
+</form>
+
+<div id="result"></div>
+
+<script>
+  async function sha256(message) {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  function getTodayYYYYMMDD() {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}${mm}${dd}`;
+  }
+
+  document.getElementById('generateSigBtn').addEventListener('click', async () => {
+    const dateStr = getTodayYYYYMMDD();
+    const sig = await sha256(dateStr);
+    document.getElementById('signature').value = sig;
+  });
+
+  document.getElementById('headerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const token = document.getElementById('token').value.trim();
+    const ua = document.getElementById('useragent').value.trim();
+    const signature = document.getElementById('signature').value.trim();
+    const result = document.getElementById('result');
+    result.textContent = 'Sending request...';
+
+    try {
+      const res = await fetch('/api/validate', {
+        method: 'POST',
+        headers: {
+          'X-Auth-Token': token,
+          'X-Request-Signature': signature,
+          'User-Agent': ua,
+        }
+      });
+
+      if (res.status === 200) {
+        const flag = res.headers.get('X-Flag') || 'Flag not found';
+        result.textContent = `🎉 Success! Flag: ${flag}`;
+      } else if (res.status === 403) {
+        const data = await res.json();
+        result.textContent = `⛔ Access Denied: ${data.message}`;
+      } else {
+        result.textContent = `Error: HTTP status ${res.status}`;
+      }
+    } catch (err) {
+      result.textContent = `Request failed: ${err.message}`;
+    }
+  });
+</script>
+
+</body>
+</html>
